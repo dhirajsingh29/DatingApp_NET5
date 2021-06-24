@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.Tasks;
 using API.Data;
 using API.Entities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -31,6 +32,26 @@ namespace API.Extensions
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["TokenKey"])),
                         ValidateIssuer = false,
                         ValidateAudience = false
+                    };
+
+                    // this is done to pass access token as query parameter for SignalR
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnMessageReceived = context => 
+                        {
+                            // this needs to be specific, because SignalR, by default, will send our token 
+                            // as a query string with the key of access_token 
+                            var accessToken = context.Request.Query["access_token"];
+
+                            var path = context.HttpContext.Request.Path;
+
+                            // path.StartsWithSegments should have /hubs, as mentioned in Startup.cs class
+                            // as we can have multiple hubs, so matching just hubs will match all
+                            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                                context.Token = accessToken;
+
+                            return Task.CompletedTask;
+                        }
                     };
                 });
 
